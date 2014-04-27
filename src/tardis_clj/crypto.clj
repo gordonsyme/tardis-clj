@@ -20,9 +20,13 @@
    "e0" "e1" "e2" "e3" "e4" "e5" "e6" "e7" "e8" "e9" "ea" "eb" "ec" "ed" "ee" "ef"
    "f0" "f1" "f2" "f3" "f4" "f5" "f6" "f7" "f8" "f9" "fa" "fb" "fc" "fd" "fe" "ff"])
 
-(defn ->hex-string
+(defn byte->hex-string
+  [byte]
+  (get hex (bit-and 0xFF byte)))
+
+(defn bytes->hex-string
   [bytes]
-  (apply str (map #(get hex (bit-and 0xFF %)) bytes)))
+  (apply str (map byte->hex-string bytes)))
 
 (defn sha1sum
   "Generate the sha1sum of data. Data is expected to be a sequence of
@@ -32,4 +36,4 @@
   (let [hasher (doto (MessageDigest/getInstance "SHA-1") (.reset))]
     (doseq [part data]
       (.update hasher part))
-    (->hex-string (.digest hasher))))
+    (bytes->hex-string (.digest hasher))))

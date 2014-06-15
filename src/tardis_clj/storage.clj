@@ -8,9 +8,9 @@
   (let [objects (:object-summaries (s3/list-objects bucket-name key))]
     (some #(= key %) (map :key objects))))
 
-(def put-object (s3/put-object))
+(def put-object s3/put-object)
 
-(def get-object (s3/get-object))
+(def get-object s3/get-object)
 
 (defn init
   [credentials-path]

@@ -2,6 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.edn :as edn]
             [me.raynes.fs :as fs]
+            [clj-time.core :as time]
             [tardis-clj.nio :as nio]
             [tardis-clj.crypto :as crypto]
             [tardis-clj.util :refer (inspect)])
@@ -25,10 +26,14 @@
 
 (defn- create-file-map
   [file]
+  ; TODO manifest format needs to be defined as a schema
   {:key (->key file)
    :metadata {:owner (nio/owner file)
               :group (nio/group file)
-              :mode (nio/mode file)}})
+              :mode (nio/mode file)
+              :ctime (nio/ctime file)
+              :mtime (nio/mtime file)
+              :size (nio/size file)}})
 
 (defn- handle-files
   [dir files]

@@ -7,6 +7,8 @@
             [tardis-clj.util :refer (inspect)])
   (:import [java.io File]))
 
+(set! *warn-on-reflection* true)
+
 (defn shasum
   [^File file]
   (let [buffer-size (* 32 1024)
@@ -37,10 +39,39 @@
 (defn- update-tree
   "Add data for all the files in 'root' to the manifest tree"
   [tree [root dirs files]]
-  (assoc-in tree (fs/split (str root)) (handle-files root files)))
+  (assoc-in tree (fs/split root) (handle-files root files)))
+
+(defn- build-tree
+  [skip-fn dir]
+  {:pre [(fs/directory? dir)]}
+  (let [path (fs/normalized-path dir)
+        foo (filter (complement #(skip-fn (first %))) (fs/iterate-dir path))]
+    (reduce update-tree {} foo)))
+
+(defn- build-manifest-tree
+  [store-details skip-fn user dir]
+  {:timestamp (.getMillis (time/now))
+   :tree (build-tree skip-fn dir)
+   :owner user
+   :store store-details})
 
 (defn build-manifest
-  [dir]
-  {:pre [(fs/directory? dir)]}
-  (let [path (fs/normalized-path dir)]
-    (reduce update-tree {} (fs/iterate-dir path))))
+  [skip-fn dirs]
+  (let [store-details {:bucket "net.twiceasgood.backup" :key-prefix "data"}
+        user (System/getenv "USER")
+        trees (for [dir dirs]
+          (build-manifest-tree store-details skip-fn user dir))]
+    {:trees (vec trees)}))
+
+
+(defn- flatten-tree*
+  [leaf? ks tree]
+  (if (leaf? tree)
+    {ks tree}
+    (apply merge
+      (for [k (keys tree)]
+        (flatten-tree* leaf? (conj ks k) (get tree k))))))
+
+(defn flatten-tree
+  [leaf? tree]
+  (flatten-tree* leaf? [] tree))

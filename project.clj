@@ -5,7 +5,9 @@
             :url "https://www.gnu.org/licenses/gpl-3.0.txt"}
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.clojure/core.typed "0.2.44"]
-                 [me.raynes/fs "1.4.4"]
+                 [org.clojure/data.csv "0.1.2"]
+                 [me.raynes/fs "1.4.5"]
+                 [clj-time "0.7.0"]
                  [amazonica "0.2.12"]]
   :main ^:skip-aot tardis-clj.core
   :target-path "target/%s"

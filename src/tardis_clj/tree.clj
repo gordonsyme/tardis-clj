@@ -24,7 +24,7 @@
   (let [name-bytes [(.getBytes (fs/base-name file))]]
     (str (crypto/sha1sum name-bytes) "/" (shasum file))))
 
-(defn- create-file-map
+(defn create-file-map
   [file]
   ; TODO manifest format needs to be defined as a schema
   {:key (->key file)

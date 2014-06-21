@@ -1,5 +1,6 @@
 (ns tardis-clj.csv
-  (:require [clojure.java.io :as io]
+  (:require [clojure.string :refer (replace-first)]
+            [clojure.java.io :as io]
             [clojure.data.csv :as csv]
             [me.raynes.fs :as fs]
             [tardis-clj.nio :as nio]
@@ -8,10 +9,11 @@
 (set! *warn-on-reflection* true)
 
 (defn parse-csv-line
-  [[path key owner group octal-mode ctime mtime size]]
-  (let [->int (fn [s] (Integer/parseInt s))]
+  [store [path key owner group octal-mode ctime mtime size]]
+  (let [->int (fn [s] (Integer/parseInt s))
+        prefix (re-pattern (str "^" (:key-prefix store) "/"))]
     [path
-     {:key key
+     {:key (replace-first key prefix "")
       :metadata {:owner owner
                  :group group
                  :mode (nio/->mode-string (->int octal-mode))
@@ -19,13 +21,15 @@
                  :mtime (->int mtime)
                  :size (->int size)}}]))
 
-(defn update-tree [tree csv-line]
-  (let [[path entry] (parse-csv-line csv-line)]
+(defn update-tree [store tree csv-line]
+  (let [[path entry] (parse-csv-line store csv-line)]
     (assoc-in tree (fs/split path) entry)))
 
 (defn load-csv-manifest
   [manifest store]    ; TODO more requirement for some schema and types
   {:pre [(fs/exists? manifest)]}
-  (with-open [in (io/reader manifest)]
-    {:trees [
-      {:tree (reduce update-tree {} (rest (csv/read-csv in :separator \:)))}]}))
+  (let [update-fn (partial update-tree store)]
+    (with-open [in (io/reader manifest)]
+      {:trees
+        [{:tree (reduce update-fn {} (rest (csv/read-csv in :separator \:)))
+          :store store}]})))

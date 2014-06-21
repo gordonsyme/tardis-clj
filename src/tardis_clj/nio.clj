@@ -42,21 +42,31 @@
    "r--" "r-x"
    "rw-" "rwx"])
 
+(defn- integral->mode-string
+  [octal-mode]
+  (let [lookup (fn [n] (get octal-modestring-lookup (bit-and n 0x7)))
+        foo (fn [n] (take 3 (iterate (fn [i] (bit-shift-right i 3)) n)))]
+    (->> (foo octal-mode)
+         (map lookup)
+         reverse
+         (apply str))))
+
 (extend-protocol FileMode
   Long
   (->mode-string [octal-mode]
-    (let [lookup (fn [n] (get octal-modestring-lookup (bit-and n 0x7)))
-          foo (fn [n] (take 3 (iterate (fn [i] (bit-shift-right i 3)) n)))]
-      (->> (foo octal-mode)
-           (map lookup)
-           reverse
-           (apply str))))
+    (integral->mode-string octal-mode))
 ;;  (->permissions [octal-mode]
 ;;    #{PosixFilePermission/OWNER_READ PosixFilePermission/OWNER_WRITE PosixFilePermission/OWNER_EXECUTE
 ;;      PosixFilePermission/OTHERS_READ PosixFilePermission/OTHERS_WRITE PosixFilePermission/OTHERS_EXECUTE})
 ;;  (->octal-mode [octal-mode]
 ;;    octal-mode)
   )
+
+;; TODO There is a way to use the protocol info for Long for Integer too
+(extend-protocol FileMode
+  Integer
+  (->mode-string [octal-mode]
+    (integral->mode-string octal-mode)))
 
 (t/ann owner [File -> String])
 (defn owner

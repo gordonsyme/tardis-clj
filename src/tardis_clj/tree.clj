@@ -62,7 +62,8 @@
 
 (defn build-manifest
   [skip-fn dirs]
-  (let [store-details {:bucket "net.twiceasgood.backup" :key-prefix "data"}
+  ;; FIXME putting the store details here is a horrible hack
+  (let [store-details {:type :s3 :bucket "net.twiceasgood.backup" :key-prefix "data"}
         user (System/getenv "USER")
         trees (for [dir dirs]
           (build-manifest-tree store-details skip-fn user dir))]

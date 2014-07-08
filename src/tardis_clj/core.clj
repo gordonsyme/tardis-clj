@@ -1,5 +1,6 @@
 (ns tardis-clj.core
   (:require [clojure.java.io :as io]
+            [clojure.tools.logging :refer (infof errorf)]
             [me.raynes.fs :as fs]
             [tardis-clj.storage :as storage]
             [tardis-clj.tree :as tree]
@@ -31,17 +32,6 @@
   [node]
   (and (:key node) (:metadata node)))
 
-;; TODO This should restore mtime and ctime too
-(defn restore-file
-  [store to-file file-map]
-  (let [object (storage/get-object (inspect (:bucket store))
-                                   (inspect (str (:key-prefix store) "/" (:key file-map))))]
-    (println "restoring to" to-file)
-    (fs/mkdirs (fs/parent to-file))
-    (with-open [stream (java.util.zip.GZIPInputStream. (:object-content object))
-                output (io/output-stream to-file)]
-      (io/copy stream output))))
-
 (defn restore-tree
   [store tree dir]
   {:pre [(fs/directory? dir)]}
@@ -50,11 +40,12 @@
           restore? (or (not (fs/exists? new-path))
                        (not= (:key file-map)
                              (:key (tree/create-file-map new-path))))]
+      (infof "Restoring %s? %s" pathvec restore?)
       (when restore?
         (try
-          (restore-file store new-path file-map)
+          (storage/restore store new-path file-map)
           (catch Exception e
-            (.printStackTrace e)))))))
+            (errorf e "Unable to restore %s to %s" pathvec new-path))))))) ;;.printStackTrace e)))))))
 
 (defn restore
   [manifest from-dir to-dir]

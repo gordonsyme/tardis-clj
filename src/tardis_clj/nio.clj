@@ -5,13 +5,19 @@
                     Reader]
            [java.nio.file Files
                           LinkOption
+                          attribute.FileTime
                           attribute.PosixFileAttributeView
                           attribute.PosixFilePermission
-                          attribute.PosixFilePermissions]))
+                          attribute.PosixFilePermissions]
+           [java.util.concurrent TimeUnit]))
 
 (set! *warn-on-reflection* true)
 
 (t/def-alias ModeString String)
+
+
+(def default-link-options
+  (into-array java.nio.file.LinkOption []))
 
 
 (t/ann attribute-view [File -> PosixFileAttributeView])
@@ -19,7 +25,7 @@
   [^File file]
   (Files/getFileAttributeView (.toPath file)
                               PosixFileAttributeView
-                              (into-array java.nio.file.LinkOption [])))
+                              default-link-options))
 
 (t/ann mode [File -> ModeString])
 (defn mode
@@ -88,18 +94,36 @@
 
 (t/ann ctime [File -> Long])
 (defn ctime
+  "Not actually proper ctime, NIO doesn't provide access to the ctime and
+  instead gives you 'creationTime', which is mtime on a POSIX file system. Go
+  figure."
   [^File file]
-  12345)
+  (-> file
+      attribute-view
+      .readAttributes
+      .creationTime
+      .toMillis
+      (/ 1000)))
 
 (t/ann mtime [File -> Long])
 (defn mtime
   [^File file]
-  12345)
+  (-> file
+      attribute-view
+      .readAttributes
+      .lastModifiedTime
+      .toMillis
+      (/ 1000)))
+
+(t/ann set-mtime [File Long -> Any])
+(defn set-mtime
+  [^File file timestamp]
+  (Files/setLastModifiedTime (.toPath file) (FileTime/from timestamp TimeUnit/SECONDS)))
 
 (t/ann size [File -> Long])
 (defn size
   [^File file]
-  12345)
+  (Files/size (.toPath file)))
 
 
 ; (t/ann chunked-read [InputStream ByteArray Int -> Seq(ByteArray)])

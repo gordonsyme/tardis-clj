@@ -6,6 +6,7 @@
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.clojure/core.typed "0.2.44"]
                  [org.clojure/data.csv "0.1.2"]
+                 [org.clojure/tools.logging "0.3.0"]
                  [me.raynes/fs "1.4.5"]
                  [clj-time "0.7.0"]
                  [amazonica "0.2.12"]]

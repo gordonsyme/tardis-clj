@@ -52,15 +52,16 @@
   [store ^File to-file file-map]
   (let [object (s3/get-object (:bucket store)
                               (->s3-key store file-map))]
-    (debugf "restoring to %s" to-file)
-    (fs/mkdirs (fs/parent to-file))
-    (with-open [stream (java.util.zip.GZIPInputStream. (:object-content object))
-                output (io/output-stream to-file)]
-      (io/copy stream output))
-    ;; Setting owner/group may not work, no guarantee that the same owner/group exist on this system
-    ;(nio/set-owner to-file (-> file-map :metadata :owner))
-    ;(nio/set-group to-file (-> file-map :metadata :group))
-    (nio/set-mtime to-file (-> file-map :metadata :mtime))))
+    (when (needs-update to-file (:key file-map))
+      (debugf "restoring to %s" to-file)
+      (fs/mkdirs (fs/parent to-file))
+      (with-open [stream (java.util.zip.GZIPInputStream. (:object-content object))
+                  output (io/output-stream to-file)]
+        (io/copy stream output))
+      ;; Setting owner/group may not work, no guarantee that the same owner/group exist on this system
+      ;(nio/set-owner to-file (-> file-map :metadata :owner))
+      ;(nio/set-group to-file (-> file-map :metadata :group))
+      (nio/set-mtime to-file (-> file-map :metadata :mtime)))))
 
 
 ; (t/ann save (Store File tree/FileMap -> Any))

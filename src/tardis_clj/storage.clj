@@ -5,8 +5,11 @@
             [me.raynes.fs :as fs]
             [amazonica.core :refer (defcredential)]
             [amazonica.aws.s3 :as s3]
-            [tardis-clj.nio :as nio])
+            [tardis-clj.nio :as nio]
+            [tardis-clj.tree :as tree])
   (:import [java.io File]))
+
+(set! *warn-on-reflection* true)
 
 (defn exists?
   [bucket-name key]
@@ -24,6 +27,16 @@
 ;;  (exists? [this key])
 ;;  (list [this]))
 
+
+(defn needs-update
+  [^File file file-map]
+  ;; FIXME I don't like that this needs access to the tree ns
+  (let [files-equal? (= (tree/->key file) (:key file-map))
+        local-newer? (> (-> file-map :metadata :mtime) (nio/mtime file))]
+    (not
+      (and (fs/exists? file)
+           (or files-equal?
+               local-newer?)))))
 
 (defn ->s3-key
   [store file-map]

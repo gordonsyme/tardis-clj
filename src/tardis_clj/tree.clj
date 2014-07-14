@@ -17,7 +17,7 @@
     (with-open [stream (io/input-stream file)]
       (crypto/sha1sum (nio/chunked-read stream buffer buffer-size)))))
 
-(defn- ->key
+(defn ->key
   [^File file]
   "A key for the blob representing this file. Formed from the sha1 of the
   filename followed by a '/' and the sha1 of the file content"

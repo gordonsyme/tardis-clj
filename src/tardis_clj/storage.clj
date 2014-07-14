@@ -43,7 +43,7 @@
   (str (:key-prefix store) "/" (:key file-map)))
 
 
-; (t/ann restore (Store File tree/FileMap -> Any))
+; (t/ann restore [Store File tree/FileMap -> Any])
 (defmulti restore
   (fn [store to-file file-map] (:type store)))
 
@@ -64,7 +64,7 @@
       (nio/set-mtime to-file (-> file-map :metadata :mtime)))))
 
 
-; (t/ann save (Store File tree/FileMap -> Any))
+; (t/ann save [Store File tree/FileMap -> Any])
 (defmulti save
   (fn [store from-file file-map] (:type store)))
 
@@ -79,6 +79,7 @@
                    :metadata {})))
 
 
+; (t/ann init [String -> Any])
 (defn init
   [credentials-path]
   (let [credentials (edn/read-string (slurp credentials-path))]

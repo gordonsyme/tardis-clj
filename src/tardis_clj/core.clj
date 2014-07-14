@@ -45,7 +45,7 @@
         (try
           (storage/restore store new-path file-map)
           (catch Exception e
-            (errorf e "Unable to restore %s to %s" pathvec new-path))))))) ;;.printStackTrace e)))))))
+            (errorf e "Unable to restore %s to %s" pathvec new-path)))))))
 
 (defn restore
   [manifest from-dir to-dir]

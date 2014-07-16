@@ -55,9 +55,32 @@
     (doseq [{:keys [tree store]} from-trees]
       (restore-tree store (flatten-tree tree) to-dir))))
 
+(defn restore-command
+  [backup-dirs]
+  (let [manifest (tree/build-manifest skip backup-dirs)]
+    (println "restore: " (pr-str manifest))))
+
+
+;; To save files:
+;; * build the manifest
+;;   * getting the paths to upload means flattening the manifest - how to correlate uploaded file to correct manifest entry?
+;; * [being proper] copy file to temp space
+;; * upload gzip to S3
+;; * record file as success (uploaded or already present) or failure
+;; * result is two manifests - successful files and failed files
+;; * uploaded manifest is just the successful files
+
+
+(defn save-command
+  [backup-dirs]
+  (let [manifest (tree/build-manifest skip backup-dirs)]
+    (println "save: ")
+    (clojure.pprint/pprint manifest)))
+
 (defn -main
   "I don't do a whole lot ... yet."
-  [root-dir & dirs]
-  (let [backup-dirs (map io/file (cons root-dir dirs))
-        manifest (tree/build-manifest skip backup-dirs)]
-    (println (pr-str manifest))))
+  [command root-dir & dirs]
+  (let [backup-dirs (map io/file (cons root-dir dirs))]
+    (case command
+      "restore" (restore-command backup-dirs)
+      "save" (save-command backup-dirs))))

@@ -30,6 +30,6 @@
   {:pre [(fs/exists? manifest)]}
   (let [update-fn (partial update-tree store)]
     (with-open [in (io/reader manifest)]
-      {:trees
+      {:data
         [{:tree (reduce update-fn {} (rest (csv/read-csv in :separator \:)))
           :store store}]})))

@@ -25,8 +25,8 @@
                       (let [subtree (get-subtree (:tree tree-map))]
                         (assoc tree-map :tree subtree)))]
     (->> manifest
-         :trees
-         (map update-tree))))
+         :data
+         update-tree)))
 
 (defn leaf?
   [node]
@@ -51,15 +51,16 @@
 (defn restore
   [manifest from-dir to-dir]
   {:pre [(fs/directory? to-dir)]}
-  (let [from-trees (restorable-trees manifest from-dir)]
-    (doseq [{:keys [tree store]} from-trees]
-      (restore-tree store tree to-dir))))
+  (let [{:keys [tree store]} (restorable-trees manifest from-dir)]
+    (restore-tree store tree to-dir)))
 
 (defn restore-command
-  [backup-dirs]
-  (let [manifest (tree/build-manifest skip backup-dirs)]
-    (println "restore: ")
-    (clojure.pprint/pprint manifest)))
+  [store from-dir to-dir]
+  (let [manifest (storage/get-manifest store)]
+    (println "restore manifest: ")
+    (clojure.pprint/pprint manifest)
+    (infof "Restoring %s to %s" from-dir to-dir)
+    (restore manifest from-dir to-dir)))
 
 (defn save-one
   [store pathvec file-map]
@@ -78,10 +79,15 @@
 
 (defn save
   [manifest]
-  (let [f (fn [{:keys [tree store] :as t}]
-            (let [[successes failures] (save-tree store tree)]
-              (assoc t :tree successes)))]
-    (assoc manifest :trees (vec (map f (:trees manifest))))))
+  (let [{:keys [tree store] :as t} (:data manifest)
+        [successes failures] (save-tree store tree)
+        new-manifest (assoc manifest :data (assoc t :tree successes))]
+    (storage/update-manifest store new-manifest)
+    (with-open [w (io/writer "failures.edn")]
+      (.write w (pr-str failures)))
+    new-manifest))
+
+
 
 ;; To save files:
 ;; * build the manifest
@@ -94,8 +100,8 @@
 
 
 (defn save-command
-  [backup-dirs]
-  (let [manifest (tree/build-manifest skip backup-dirs)
+  [store backup-dirs]
+  (let [manifest (tree/build-manifest store skip backup-dirs)
         saved (save manifest)]
     (println "save: ")
     (clojure.pprint/pprint manifest)
@@ -105,9 +111,13 @@
 
 (defn -main
   "I don't do a whole lot ... yet."
-  [command root-dir & dirs]
+  [command & args]
   (init)
-  (let [backup-dirs (map io/file (cons root-dir dirs))]
+  (let [store {:type :s3 :bucket "net.twiceasgood.backup" :key-prefix "data"}]
     (case command
-      "restore" (restore-command backup-dirs)
-      "save" (save-command backup-dirs))))
+      "restore"
+        (let [[from-dir to-dir & _] args]
+          (restore-command store (io/file from-dir) (io/file to-dir)))
+      "save"
+        (let [[root-dir & other-dirs] args]
+          (save-command store (map io/file (cons root-dir other-dirs)))))))

@@ -8,13 +8,15 @@
             [tardis-clj.nio :as nio]
             [tardis-clj.util :refer (with-temp-file inspect)]
             [tardis-clj.tree :as tree])
-  (:import [java.io File]))
+  (:import [java.io File
+                    PushbackReader]))
 
 (set! *warn-on-reflection* true)
 
 (defn exists?
   [bucket-name key]
-  (let [objects (:object-summaries (s3/list-objects bucket-name key))]
+  (let [objects (:object-summaries (s3/list-objects :bucket-name bucket-name
+                                                    :prefix key))]
     (some #(= key %) (map :key objects))))
 
 ;; Should have a protocol to get/put/list objects to/from/in each different store type
@@ -53,8 +55,8 @@
 (defmethod restore :s3
   [store ^File to-file file-map]
   (infof "fetching %s %s" (:bucket store) (->s3-key store file-map))
-  (let [object (s3/get-object (:bucket store)
-                              (->s3-key store file-map))]
+  (let [object (s3/get-object :bucket-name (:bucket store)
+                              :key (->s3-key store file-map))]
     (when (needs-update to-file (:key file-map))
       (debugf "restoring to %s" to-file)
       (fs/mkdirs (fs/parent to-file))
@@ -89,13 +91,35 @@
   [store ^File from-file file-map]
   (infof "saving %s to %s" from-file file-map)
   (infof "checking if object already exists...")
-  (let [objects (s3/list-objects (:bucket store) (->s3-key store file-map))]
+  (let [objects (s3/list-objects :bucket-name (:bucket store)
+                                 :prefix (->s3-key store file-map))]
     (if (seq (:object-summaries (inspect objects)))
       (infof "object already stored in S3")
       (do
         (infof "saving object to S3...")
         (save-s3 store from-file file-map)))))
 
+(defmulti get-manifest
+  (fn [store] (:type store)))
+
+(defmethod get-manifest :s3
+  [store]
+  (let [object (s3/get-object :bucket-name (:bucket store)
+                              :key "manifests/gordon")]
+    (with-open [stream (:object-content object)
+                reader (PushbackReader. (io/reader stream))]
+      (edn/read reader))))
+
+(defmulti update-manifest
+  (fn [store manifest] (:type store)))
+
+(defmethod update-manifest :s3
+  [store manifest]
+  (with-open [manifest-stream (java.io.ByteArrayInputStream. (.getBytes (pr-str manifest)))]
+    (s3/put-object :bucket-name (:bucket store)
+                   :key (format "manifests/%s" (-> manifest :data :owner))
+                   :input-stream manifest-stream
+                   :metadata {:server-side-encryption "AES256"})))
 
 ; (t/ann init [String -> Any])
 (defn init

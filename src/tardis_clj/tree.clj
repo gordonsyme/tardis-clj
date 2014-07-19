@@ -6,7 +6,7 @@
             [clj-time.core :as time]
             [tardis-clj.nio :as nio]
             [tardis-clj.crypto :as crypto]
-            [tardis-clj.util :refer (inspect)])
+            [tardis-clj.util :as util :refer (inspect)])
   (:import [java.io File]))
 
 (set! *warn-on-reflection* true)
@@ -55,26 +55,24 @@
     (reduce update-tree {} foo)))
 
 (defn- build-manifest-tree
-  [store-details skip-fn user dir]
-  {:timestamp (.getMillis (time/now))
-   :tree (build-tree skip-fn dir)
-   :owner user
-   :store store-details})
+  [store-details skip-fn user dirs]
+  (let [trees (map (partial build-tree skip-fn) dirs)]
+    {:timestamp (.getMillis (time/now))
+     :tree (apply util/deep-merge trees)
+     :owner user
+     :store store-details}))
 
 (defn build-manifest
   "Format is:
-  {:trees [{:timestamp ts
-            :tree { ... }
-            :owner Bob
-            :store { ... details ... }}]
+  {:data [{:timestamp ts
+           :tree { ... }
+           :owner Bob
+           :store { ... details ... }}]
    :version \"1.0\"}"
-  [skip-fn dirs]
+  [store-details skip-fn dirs]
   ;; FIXME putting the store details here is a horrible hack
-  (let [store-details {:type :s3 :bucket "net.twiceasgood.backup" :key-prefix "data"}
-        user (System/getenv "USER")
-        trees (for [dir dirs]
-          (build-manifest-tree store-details skip-fn user dir))]
-    {:trees (vec trees)
+  (let [user (System/getenv "USER")]
+    {:data (build-manifest-tree store-details skip-fn user dirs)
      :version "1.0"}))
 
 (defn tree-zipper*

@@ -62,13 +62,20 @@
    :store store-details})
 
 (defn build-manifest
+  "Format is:
+  {:trees [{:timestamp ts
+            :tree { ... }
+            :owner Bob
+            :store { ... details ... }}]
+   :version \"1.0\"}"
   [skip-fn dirs]
   ;; FIXME putting the store details here is a horrible hack
   (let [store-details {:type :s3 :bucket "net.twiceasgood.backup" :key-prefix "data"}
         user (System/getenv "USER")
         trees (for [dir dirs]
           (build-manifest-tree store-details skip-fn user dir))]
-    {:trees (vec trees)}))
+    {:trees (vec trees)
+     :version "1.0"}))
 
 
 (defn- flatten-tree*
@@ -98,25 +105,26 @@
     (z/zipper branch? children make-node tree)))
 
 (defn tree-zipper
-  "A tree is a nested map, the first level can only have one key at this time.
+  "A tree is a nested map. To ensure that all trees have a single root a
+  synthetic root node is inserted for the zipper. The other zipper related fns
+  correctly handle this synthetic root node.
   E.g.
   { \"/\" { \"home\" { \"alice\" {...}
                        \"bob\" {...}}}}
 
   Editing nodes is unsupported"
   [leaf? tree]
-  {:pre [(= 1 (count tree))]}
   (let [inner-node? (fn [n] (and (map? n) (not (leaf? n))))
         branch? (fn [n] (inner-node? (second n)))
         children (fn [n] (seq (second n)))
         make-node (fn [n children]
                     (throw (ex-info "unsupported operation" {})))]
-    (z/zipper branch? children make-node (first (seq tree)))))
+    (z/zipper branch? children make-node ["synthetic-root" tree])))
 
 (defn- tree-zipper-path
   "Get the path to the currently selected node in the tree, as a vector."
   [tz]
-  (conj (->> tz z/path (map first) vec) (-> tz z/node first)))
+  (conj (->> tz z/path rest (map first) vec) (-> tz z/node first)))
 
 (defn- visit-tree*
   [leaf? zipper visit-fn success failure]

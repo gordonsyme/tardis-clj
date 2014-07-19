@@ -24,3 +24,7 @@
       ~@body
       (finally
         (fs/delete-dir ~dirname)))))
+
+(defn deep-merge
+  [& maps]
+  (apply merge-with deep-merge maps))

@@ -1,11 +1,12 @@
 (ns tardis-clj.storage
   (:require [clojure.java.io :as io]
             [clojure.edn :as edn]
-            [clojure.tools.logging :refer (debugf)]
+            [clojure.tools.logging :refer (debugf infof)]
             [me.raynes.fs :as fs]
             [amazonica.core :refer (defcredential)]
             [amazonica.aws.s3 :as s3]
             [tardis-clj.nio :as nio]
+            [tardis-clj.util :refer (with-temp-file inspect)]
             [tardis-clj.tree :as tree])
   (:import [java.io File]))
 
@@ -31,12 +32,13 @@
 (defn needs-update
   [^File file file-map]
   ;; FIXME I don't like that this needs access to the tree ns
-  (let [files-equal? (= (tree/->key file) (:key file-map))
-        local-newer? (> (-> file-map :metadata :mtime) (nio/mtime file))]
+  (let [files-equal? (delay (= (tree/->key file) (:key file-map)))
+        local-newer? (delay (> (-> file-map :metadata :mtime)
+                               (nio/mtime file)))]
     (not
       (and (fs/exists? file)
-           (or files-equal?
-               local-newer?)))))
+           (or @files-equal?
+               @local-newer?)))))
 
 (defn ->s3-key
   [store file-map]
@@ -50,6 +52,7 @@
 ;; TODO This should restore mtime and ctime too
 (defmethod restore :s3
   [store ^File to-file file-map]
+  (infof "fetching %s %s" (:bucket store) (->s3-key store file-map))
   (let [object (s3/get-object (:bucket store)
                               (->s3-key store file-map))]
     (when (needs-update to-file (:key file-map))
@@ -68,15 +71,30 @@
 (defmulti save
   (fn [store from-file file-map] (:type store)))
 
+
+(defn save-s3
+  [store ^File from-file file-map]
+  (with-temp-file archive
+    (with-open [in-stream (io/input-stream from-file)
+                stream (io/output-stream archive)
+                output (java.util.zip.GZIPOutputStream. stream)]
+      (io/copy in-stream output))
+    (with-open [stream (io/input-stream archive)]
+      (s3/put-object :bucket-name (:bucket store)
+                     :key (->s3-key store file-map)
+                     :input-stream stream
+                     :metadata {:server-side-encryption "AES256"}))))
+
 (defmethod save :s3
   [store ^File from-file file-map]
-  (debugf "saving %s to %s" from-file file-map)
-  (with-open [stream (io/output-stream from-file)
-              output (java.util.zip.GZIPOutputStream. stream)]
-    (s3/put-object :bucket-name (:bucket store)
-                   :key (->s3-key store file-map)
-                   :input-stream output
-                   :metadata {})))
+  (infof "saving %s to %s" from-file file-map)
+  (infof "checking if object already exists...")
+  (let [objects (s3/list-objects (:bucket store) (->s3-key store file-map))]
+    (if (seq (:object-summaries (inspect objects)))
+      (infof "object already stored in S3")
+      (do
+        (infof "saving object to S3...")
+        (save-s3 store from-file file-map)))))
 
 
 ; (t/ann init [String -> Any])

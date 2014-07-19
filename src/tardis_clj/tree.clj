@@ -77,19 +77,6 @@
     {:trees (vec trees)
      :version "1.0"}))
 
-
-(defn- flatten-tree*
-  [leaf? ks tree]
-  (if (leaf? tree)
-    {ks tree}
-    (apply merge
-      (for [k (keys tree)]
-        (flatten-tree* leaf? (conj ks k) (get tree k))))))
-
-(defn flatten-tree
-  [leaf? tree]
-  (flatten-tree* leaf? [] tree))
-
 (defn tree-zipper*
   [leaf? tree]
   (let [inner-node? (fn [n] (and (map? n) (not (leaf? n))))

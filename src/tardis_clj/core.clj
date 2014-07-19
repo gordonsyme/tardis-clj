@@ -32,34 +32,56 @@
   [node]
   (and (:key node) (:metadata node)))
 
+(defn restore-one
+  [store dir pathvec file-map]
+  (let [new-path (apply io/file dir pathvec)]
+    (infof "Restoring %s to %s" pathvec new-path)
+    (try
+      (storage/restore store new-path file-map)
+      true
+      (catch Exception e
+        (errorf e "Unable to restore %s to %s" pathvec new-path)
+        false))))
+
 (defn restore-tree
   [store tree dir]
   {:pre [(fs/directory? dir)]}
-  (doseq [[pathvec file-map] (take 10 tree)]
-    (let [new-path (apply io/file dir pathvec)
-          restore? (or (not (fs/exists? new-path))
-                       (not= (:key file-map)
-                             (:key (tree/create-file-map new-path))))]
-      (infof "Restoring %s? %s" pathvec restore?)
-      (when restore?
-        (try
-          (storage/restore store new-path file-map)
-          (catch Exception e
-            (errorf e "Unable to restore %s to %s" pathvec new-path)))))))
+  (tree/visit-tree leaf? tree (partial restore-one store dir)))
 
 (defn restore
   [manifest from-dir to-dir]
   {:pre [(fs/directory? to-dir)]}
-  (let [flatten-tree (partial tree/flatten-tree leaf?)
-        from-trees (restorable-trees manifest from-dir)]
+  (let [from-trees (restorable-trees manifest from-dir)]
     (doseq [{:keys [tree store]} from-trees]
-      (restore-tree store (flatten-tree tree) to-dir))))
+      (restore-tree store tree to-dir))))
 
 (defn restore-command
   [backup-dirs]
   (let [manifest (tree/build-manifest skip backup-dirs)]
-    (println "restore: " (pr-str manifest))))
+    (println "restore: ")
+    (clojure.pprint/pprint manifest)))
 
+(defn save-one
+  [store pathvec file-map]
+  (let [path (apply io/file pathvec)]
+    (infof "Saving %s" path)
+    (try
+      (storage/save store path file-map)
+      true
+      (catch Exception e
+        (errorf e "Unable to save %s to %s" pathvec store)
+        false))))
+
+(defn save-tree
+  [store tree]
+  (tree/visit-tree leaf? tree (partial save-one store)))
+
+(defn save
+  [manifest]
+  (let [f (fn [{:keys [tree store] :as t}]
+            (let [[successes failures] (save-tree store tree)]
+              (assoc t :tree successes)))]
+    (assoc manifest :trees (vec (map f (:trees manifest))))))
 
 ;; To save files:
 ;; * build the manifest
@@ -73,13 +95,18 @@
 
 (defn save-command
   [backup-dirs]
-  (let [manifest (tree/build-manifest skip backup-dirs)]
+  (let [manifest (tree/build-manifest skip backup-dirs)
+        saved (save manifest)]
     (println "save: ")
-    (clojure.pprint/pprint manifest)))
+    (clojure.pprint/pprint manifest)
+    (println "saved: ")
+    (clojure.pprint/pprint saved)
+    (println "equal?: " (= manifest saved))))
 
 (defn -main
   "I don't do a whole lot ... yet."
   [command root-dir & dirs]
+  (init)
   (let [backup-dirs (map io/file (cons root-dir dirs))]
     (case command
       "restore" (restore-command backup-dirs)

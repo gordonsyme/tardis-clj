@@ -51,8 +51,12 @@
 (defn restore
   [manifest from-dir to-dir]
   {:pre [(fs/directory? to-dir)]}
-  (let [{:keys [tree store]} (restorable-trees manifest from-dir)]
-    (restore-tree store tree to-dir)))
+  (let [{:keys [tree store] :as t} (restorable-trees manifest from-dir)
+        [successes failures] (restore-tree store tree to-dir)
+        new-manifest (assoc manifest :data (assoc t :tree successes))]
+    (with-open [w (io/writer "restore-failures.edn")]
+      (.write w (pr-str failures)))
+    new-manifest))
 
 (defn restore-command
   [store from-dir to-dir]
@@ -83,10 +87,9 @@
         [successes failures] (save-tree store tree)
         new-manifest (assoc manifest :data (assoc t :tree successes))]
     (storage/update-manifest store new-manifest)
-    (with-open [w (io/writer "failures.edn")]
+    (with-open [w (io/writer "save-failures.edn")]
       (.write w (pr-str failures)))
     new-manifest))
-
 
 
 ;; To save files:

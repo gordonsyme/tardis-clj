@@ -2,6 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.edn :as edn]
             [clojure.zip :as z]
+            [clojure.tools.logging :refer (infof)]
             [me.raynes.fs :as fs]
             [clj-time.core :as time]
             [tardis-clj.nio :as nio]
@@ -28,6 +29,7 @@
 (defn create-file-map
   [file]
   ; TODO manifest format needs to be defined as a schema
+  (infof "building file-map for %s" file)
   {:key (->key file)
    :metadata {:owner (nio/owner file)
               :group (nio/group file)

@@ -117,7 +117,7 @@
   [store manifest]
   (with-open [manifest-stream (java.io.ByteArrayInputStream. (.getBytes (pr-str manifest)))]
     (s3/put-object :bucket-name (:bucket store)
-                   :key (format "manifests/%s" (-> manifest :data :owner))
+                   :key (format "manifests/%s-new" (-> manifest :data :owner))
                    :input-stream manifest-stream
                    :metadata {:server-side-encryption "AES256"})))
 
